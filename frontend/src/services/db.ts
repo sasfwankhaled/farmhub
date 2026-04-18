@@ -14,41 +14,10 @@ export enum OperationType {
   WRITE = 'write',
 }
 
-interface DataErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
-}
-
 function handleDataError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: DataErrorInfo = {
-    error: error instanceof Error ? error.message : (typeof error === 'object' ? JSON.stringify(error) : String(error)),
-    authInfo: {
-      userId: undefined,
-      email: undefined,
-      emailVerified: undefined,
-      isAnonymous: undefined,
-      tenantId: undefined,
-      providerInfo: []
-    },
-    operationType,
-    path
-  };
-  console.error('Data Layer Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  const errMsg = error instanceof Error ? error.message : (typeof error === 'object' ? JSON.stringify(error) : String(error));
+  console.error(`[DB] ${operationType} on '${path}' failed:`, errMsg);
+  throw new Error(errMsg);
 }
 
 const toSnakeCase = (input: string) => input.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
@@ -74,14 +43,6 @@ const mapKeysDeep = (value: any, mapper: (k: string) => string): any => {
   return value;
 };
 
-export const testConnection = async () => {
-  try {
-    const { error } = await supabase.from('settings').select('id').limit(1);
-    if (error) throw error;
-  } catch (error) {
-    console.error("Please check your Supabase configuration. ");
-  }
-};
 
 export const getCollection = async <T>(path: string, columns: string = '*') => {
   try {
@@ -170,14 +131,3 @@ export const deleteDocument = async (path: string, id: string) => {
   }
 };
 
-export const queryCollection = () => {
-  throw new Error('queryCollection is not implemented in Supabase adapter.');
-};
-
-export const whereFilter = () => {
-  throw new Error('whereFilter is not implemented in Supabase adapter.');
-};
-
-export const orderByField = () => {
-  throw new Error('orderByField is not implemented in Supabase adapter.');
-};

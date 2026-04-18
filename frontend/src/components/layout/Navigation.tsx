@@ -12,9 +12,7 @@ import {
   Package,
   DollarSign,
   Users,
-  Archive,
-  Sprout,
-  Truck
+  Sprout
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';

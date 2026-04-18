@@ -26,7 +26,6 @@ export const Login = () => {
         await signInFarmer(farmerEmail, password, rememberMe);
       }
     } catch (err: any) {
-      console.error(err);
       if (loginMode === 'farmer') {
         if (String(err?.message || '').includes('farmer-account-not-linked')) {
           setError('هذا المستخدم غير مربوط بحساب مزارع مفعل في النظام.');
