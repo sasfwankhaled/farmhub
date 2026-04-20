@@ -7,8 +7,8 @@ import {
   Search, Calendar, Edit2, Trash2, X,
   ArrowLeft, Users
 } from 'lucide-react';
-import { subscribeToCollection, createDocument, updateDocument, deleteDocument, getCollection } from '../services/db';
-import { Shipment, ShipmentStatus, Entity, Crop, Farm } from '../types';
+import { subscribeToCollection, createDocument, updateDocument, deleteDocument, getCollection, getDocument } from '../services/db';
+import { Shipment, ShipmentStatus, Entity, Crop, Farm, Settings, GlobalPrice } from '../types';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 
 const DAYS = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
@@ -27,6 +27,8 @@ export default function ShipmentsPage() {
   const [entities, setEntities] = useState<Entity[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [globalPrices, setGlobalPrices] = useState<GlobalPrice[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,6 +49,7 @@ export default function ShipmentsPage() {
     day: '',
     packagesCount: 0,
     status: 'loaded',
+    boxRentalPerUnit: 0,
   });
 
   const sortByDate = (data: Shipment[]) =>
@@ -59,11 +62,15 @@ export default function ShipmentsPage() {
       getCollection<Entity>('entities'),
       getCollection<Crop>('crops'),
       getCollection<Farm>('farms'),
-    ]).then(([s, e, c, f]) => {
+      getDocument<Settings>('settings', 'global'),
+      getCollection<GlobalPrice>('global_prices'),
+    ]).then(([s, e, c, f, st, p]) => {
       if (s) setShipments(sortByDate(s));
       if (e) setEntities(e);
       if (c) setCrops(c);
       if (f) setFarms(f);
+      if (st) setSettings(st);
+      if (p) setGlobalPrices(p);
       setLoading(false);
     }).catch(() => setLoading(false));
 
@@ -115,7 +122,19 @@ export default function ShipmentsPage() {
         setMixedCountB('');
       }
     } else {
-      setForm({ date: new Date().toISOString().split('T')[0], day: '', packagesCount: 0, status: 'loaded' });
+      let defaultFee = settings?.transportFeePerUnit || 0;
+      if (!defaultFee && globalPrices.length > 0) {
+        const transportItem = globalPrices.find(p => p.name.includes('نقل') || p.name.toLowerCase().includes('transport'));
+        if (transportItem) defaultFee = transportItem.value;
+      }
+
+      setForm({
+        date: new Date().toISOString().split('T')[0],
+        day: '',
+        packagesCount: 0,
+        status: 'loaded',
+        boxRentalPerUnit: defaultFee
+      });
       setEditingId(null);
       setGradeSelection('A');
       setMixedCountA('');
@@ -198,7 +217,8 @@ export default function ShipmentsPage() {
             farmId,
             cropName: selectedCropName,
             merchantName: selectedMerchantName,
-            grade: gradeSelection
+            grade: gradeSelection,
+            boxRentalPerUnit: form.boxRentalPerUnit || 0
           });
           toast.success('تمت إضافة الشحنة بنجاح');
         }
@@ -634,6 +654,24 @@ export default function ShipmentsPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Transport Fee Override */}
+                <div className="space-y-1.5 p-4 bg-purple-50 rounded-2xl border border-purple-100">
+                  <label className="text-sm font-bold text-purple-900">سعر النقل لهذه الشحنة (₪ لكل طرد)</label>
+                  <div className="relative">
+                    <Truck className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400 pointer-events-none" />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={form.boxRentalPerUnit || ''}
+                      onChange={(e) => setForm({ ...form, boxRentalPerUnit: parseFloat(e.target.value) || 0 })}
+                      className="w-full pl-4 pr-10 py-3 bg-white border border-purple-200 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none text-purple-900 font-black"
+                      placeholder="0.0"
+                    />
+                  </div>
+                  <p className="text-[10px] font-bold text-purple-400 pr-1">السعر الافتراضي يتم جلبه من الإعدادات، يمكنك تعديله هنا.</p>
+                </div>
 
                 {/* Date + Day */}
                 <div className="grid grid-cols-2 gap-3">

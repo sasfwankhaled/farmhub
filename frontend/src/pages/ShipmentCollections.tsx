@@ -110,7 +110,10 @@ export default function ShipmentCollectionsPage() {
       const transportItem = globalPrices.find(p => p.name.includes('نقل') || p.name.toLowerCase().includes('transport'));
       if (transportItem) defaultTransportPrice = transportItem.value.toString();
     }
-    setBoxRentalPerUnit(defaultTransportPrice);
+    const initialTransportPrice = (shipment.boxRentalPerUnit !== undefined && shipment.boxRentalPerUnit !== null)
+      ? shipment.boxRentalPerUnit.toString()
+      : defaultTransportPrice;
+    setBoxRentalPerUnit(initialTransportPrice);
     setReceiptFile(null);
     setReceiptPreview('');
     setNotes('');

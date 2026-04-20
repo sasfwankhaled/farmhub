@@ -52,12 +52,9 @@ export const useFarmAnalytics = ({
       .filter((s) => s.status !== 'loaded')
       .reduce((sum, s) => sum + (s.packagesCount || 0), 0);
 
-    const deliveryFee = (() => {
-      const transportPrice = globalPrices.find((p) => p.name === 'رسوم النقل' || p.name === 'توصيل' || p.name === 'نقل');
-      return transportPrice?.value ?? settings?.transportFeePerUnit ?? 0;
-    })();
-
-    const deliveryIncome = allDeliveredPackages * deliveryFee;
+    const deliveryIncome = shipments
+      .filter((s) => s.status !== 'loaded')
+      .reduce((sum, s) => sum + asNumber(s.boxRentalTotal), 0);
 
     return {
       totalProduction,
