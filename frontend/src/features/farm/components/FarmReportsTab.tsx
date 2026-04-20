@@ -168,7 +168,7 @@ export const FarmReportsTab = ({
                   <tr key={item.id} className="hover:bg-gray-50/30 transition-colors">
                     <td className="p-4 font-black text-gray-900">{item.name}</td>
                     <td className="p-4 text-xs font-bold text-gray-500">{item.unit === 'kg' ? 'كيلو' : 'كرتونة'}</td>
-                    <td className="p-4 font-bold text-gray-700">{item.tripsCount}</td>
+                    <td className="p-4 font-bold text-gray-700">{item.shipmentsCount}</td>
                     <td className="p-4 font-black text-blue-600">{item.productionQuantity}</td>
                     <td className="p-4 font-black text-green-600">{formatCurrency(item.sales)}</td>
                     <td className="p-4 font-bold text-emerald-600">{formatCurrency(item.collected)}</td>
@@ -199,7 +199,7 @@ export const FarmReportsTab = ({
                   <div>
                     <h4 className="font-black text-gray-900">{item.name}</h4>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      {item.tripsCount} شحنات • {item.unit === 'kg' ? 'كيلو' : 'كرتونة'}
+                      {item.shipmentsCount} شحنات • {item.unit === 'kg' ? 'كيلو' : 'كرتونة'}
                     </span>
                   </div>
                   <div className="text-left">

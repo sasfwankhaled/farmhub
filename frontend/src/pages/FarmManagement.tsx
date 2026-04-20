@@ -228,10 +228,10 @@ export default function FarmManagementPage() {
       const key = s.cropId || 'unknown';
       const name = s.cropName || allRelevantCrops.find(c => c.id === s.cropId)?.name || 'غير محدد';
       if (!map.has(key)) {
-        map.set(key, { id: key, name, tripsCount: 0, productionQuantity: 0, sales: 0, farmerNet: 0, collected: 0, collectedNet: 0, pending: 0, pendingNet: 0, averagePricePerUnit: 0 });
+        map.set(key, { id: key, name, shipmentsCount: 0, productionQuantity: 0, sales: 0, farmerNet: 0, collected: 0, collectedNet: 0, pending: 0, pendingNet: 0, averagePricePerUnit: 0 });
       }
       const r = map.get(key)!;
-      r.tripsCount++;
+      r.shipmentsCount++;
       r.productionQuantity += s.packagesCount || 0;
       r.sales += s.totalSaleAmount || 0;
       r.farmerNet += s.farmerNetAmount || 0;

@@ -50,26 +50,6 @@ create table if not exists public.global_prices (
   created_at timestamptz default now()
 );
 
-create table if not exists public.trips (
-  id text primary key,
-  trip_number text not null,
-  farmer_id text not null,
-  farm_id text,
-  merchant_id text not null,
-  crop_id text not null,
-  quantity numeric not null default 0,
-  status text not null check (status in ('waiting', 'delivered', 'sold', 'collected')),
-  total_sale_amount numeric default 0,
-  weight_kg numeric default 0,
-  receipt_image_url text,
-  date date not null,
-  due_date date,
-  created_at timestamptz default now(),
-  day text,
-  packages_count integer default 0,
-  farmer_delivery_status text,
-  farmer_delivered_at timestamptz
-);
 
 create table if not exists public.farm_expenses (
   id text primary key,
@@ -129,10 +109,6 @@ create table if not exists public.worker_payments (
 );
 
 create index if not exists idx_entities_type on public.entities(type);
-create index if not exists idx_trips_farmer_id on public.trips(farmer_id);
-create index if not exists idx_trips_merchant_id on public.trips(merchant_id);
-create index if not exists idx_trips_status on public.trips(status);
-create index if not exists idx_trips_date on public.trips(date);
 create index if not exists idx_farm_expenses_farmer_id on public.farm_expenses(farmer_id);
 create index if not exists idx_vehicle_expenses_farmer_id on public.vehicle_expenses(farmer_id);
 create index if not exists idx_attendance_farmer_id on public.attendance(farmer_id);
