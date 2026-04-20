@@ -86,9 +86,22 @@ export const subscribeToCollection = <T>(
       fetchLatest();
     })
     .subscribe((status) => {
-      // eslint-disable-next-line no-console
-      if (status !== 'SUBSCRIBED') console.warn(`[DB Ver 2.1] Subscription status for '${path}':`, status);
-      else console.log(`[DB Ver 2.1] Subscribed to '${path}' successfully.`);
+      if (status === 'SUBSCRIBED') {
+        // eslint-disable-next-line no-console
+        console.log(`[DB Ver 2.1] Subscribed to '${path}' successfully.`);
+      } else if (status === 'CLOSED') {
+        // eslint-disable-next-line no-console
+        if (active) {
+          console.warn(`[DB Ver 2.1] Subscription for '${path}' was closed unexpectedly.`);
+        } else {
+          console.log(`[DB Ver 2.1] Subscription for '${path}' closed normally.`);
+        }
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error(`[DB Ver 2.1] Subscription error for '${path}': Connection failed or RLS denied.`);
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn(`[DB Ver 2.1] Subscription status for '${path}':`, status);
+      }
     });
 
   return () => {
