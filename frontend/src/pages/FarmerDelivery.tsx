@@ -5,7 +5,7 @@ import {
   Users, DollarSign, CheckCircle2, Package, Archive,
   TrendingDown, TrendingUp, ChevronDown, ChevronUp, Eye, X
 } from 'lucide-react';
-import { getCollection, updateDocument } from '../services/db';
+import { subscribeToCollection, updateDocument } from '../services/db';
 import { Shipment, Entity, Crop } from '../types';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 import { supabase } from '../supabase';
@@ -32,22 +32,17 @@ export default function FarmerDeliveryPage() {
   const [previewReceipt, setPreviewReceipt] = useState<string | null>(null);
   const [isImageLoading, setIsImageLoading] = useState(false);
 
-  const loadData = async () => {
-    try {
-      const [s, e, c] = await Promise.all([
-        getCollection<Shipment>('shipments'),
-        getCollection<Entity>('entities'),
-        getCollection<Crop>('crops'),
-      ]);
-      setShipments((s || []).filter(sh => sh.status === 'collected'));
-      setEntities(e || []);
-      setCrops(c || []);
-    } finally {
+  useEffect(() => {
+    // Then subscribe for real-time updates
+    const u1 = subscribeToCollection<Shipment>('shipments', (data) => {
+      setShipments(data.filter(sh => sh.status === 'collected'));
       setLoading(false);
-    }
-  };
+    });
+    const u2 = subscribeToCollection<Entity>('entities', setEntities);
+    const u3 = subscribeToCollection<Crop>('crops', setCrops);
 
-  useEffect(() => { loadData(); }, []);
+    return () => { u1(); u2(); u3(); };
+  }, []);
 
   const farmers = entities.filter(e => e.type === 'farmer');
   const merchants = entities.filter(e => e.type === 'merchant');
@@ -90,7 +85,7 @@ export default function FarmerDeliveryPage() {
       toast.success(`✅ تم تسليم ${farmerShipments.length} شحنة للمزارع — تم نقلها للأرشيف بنجاح`);
       setDeliveringFarmerId(null);
       setConfirmNote('');
-      await loadData();
+      // No need to call loadData() - subscription handles it!
     } catch {
       toast.error('حدث خطأ أثناء التسليم');
     } finally {

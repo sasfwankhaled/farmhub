@@ -63,7 +63,9 @@ export const subscribeToCollection = <T>(
   const fetchLatest = async () => {
     try {
       const rows = await getCollection<T>(path, columns);
-      if (active && rows) callback(rows);
+      if (active && rows) {
+        callback(rows);
+      }
     } catch (error) {
       handleDataError(error, OperationType.GET, path);
     }
@@ -71,12 +73,23 @@ export const subscribeToCollection = <T>(
 
   fetchLatest();
   const channelName = `realtime:${path}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  
+  // Debug mode logging
+  // eslint-disable-next-line no-console
+  console.log(`[DB Ver 2.1] Subscribing to realtime:${path}...`);
+
   const channel = supabase
     .channel(channelName)
-    .on('postgres_changes', { event: '*', schema: 'public', table: path }, () => {
+    .on('postgres_changes', { event: '*', schema: 'public', table: path }, (payload) => {
+      // eslint-disable-next-line no-console
+      console.log(`[DB Ver 2.1] Realtime event on '${path}':`, payload.eventType, payload.new);
       fetchLatest();
     })
-    .subscribe();
+    .subscribe((status) => {
+      // eslint-disable-next-line no-console
+      if (status !== 'SUBSCRIBED') console.warn(`[DB Ver 2.1] Subscription status for '${path}':`, status);
+      else console.log(`[DB Ver 2.1] Subscribed to '${path}' successfully.`);
+    });
 
   return () => {
     active = false;
