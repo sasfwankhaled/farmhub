@@ -72,8 +72,7 @@ export const useFarmAnalytics = ({
       totalOperatingExpenses,
       netProfit,
       farmerNetProfit,
-      deliveryIncome,
-      deliveryFee
+      deliveryIncome
     };
   }, [shipments, farmExpenses, attendance, workerPayments, globalPrices, settings]);
 };
