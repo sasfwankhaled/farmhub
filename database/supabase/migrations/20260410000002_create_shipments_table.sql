@@ -19,14 +19,6 @@ create table if not exists public.shipments (
 -- تفعيل الأمان على مستوى الصف
 alter table public.shipments enable row level security;
 
--- سياسة: السماح للمستخدمين المسجلين بالقراءة والكتابة
-create policy "Allow authenticated full access on shipments"
-  on public.shipments
-  for all
-  to authenticated
-  using (true)
-  with check (true);
-
 -- فهرس لتسريع الاستعلامات حسب المزارع
 create index if not exists idx_shipments_farmer_id on public.shipments(farmer_id);
 create index if not exists idx_shipments_status on public.shipments(status);

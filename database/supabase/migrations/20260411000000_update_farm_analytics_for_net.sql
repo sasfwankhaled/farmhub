@@ -84,7 +84,7 @@ BEGIN
         'net_profit', s.total_sales - (e.total_farm_expenses + w.total_attendance_cost),
         'farmer_net_profit', s.total_farmer_net - (e.total_farm_expenses + w.total_attendance_cost),
         'crop_report', COALESCE((SELECT JSON_AGG(JSON_BUILD_OBJECT(
-            'id', cs.crop_id, 'name', cs.name, 'tripsCount', cs.trips_count, 'productionQuantity', cs.production_quantity,
+            'id', cs.crop_id, 'name', cs.name, 'shipmentsCount', cs.trips_count, 'productionQuantity', cs.production_quantity,
             'sales', cs.sales, 'farmerNet', cs.farmer_net, 'collected', cs.collected, 'collectedNet', cs.collected_net, 
             'pending', cs.sales - cs.collected, 'pendingNet', cs.farmer_net - cs.collected_net,
             'averagePricePerUnit', cs.avg_price, 'averageNetPricePerUnit', cs.avg_net_price

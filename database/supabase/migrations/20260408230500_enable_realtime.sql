@@ -8,7 +8,6 @@ alter publication supabase_realtime add table
   farmer_accounts, 
   settings, 
   global_prices, 
-  trips, 
   farm_expenses, 
   vehicle_expenses, 
   attendance, 

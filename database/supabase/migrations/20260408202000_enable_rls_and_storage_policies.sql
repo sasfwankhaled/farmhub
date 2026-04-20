@@ -47,12 +47,12 @@ as $$
     );
 $$;
 
-create or replace function public.trip_id_from_storage_name(obj_name text)
+create or replace function public.shipment_id_from_storage_name(obj_name text)
 returns text
 language sql
 immutable
 as $$
-  -- expected format: "<prefix>/<tripId>_<timestamp>_<file>"
+  -- expected format: "<prefix>/<shipmentId>_<timestamp>_<file>"
   select split_part(split_part(obj_name, '/', 2), '_', 1);
 $$;
 
@@ -65,12 +65,12 @@ as $$
     public.is_admin_user()
     or exists (
       select 1
-      from public.trips t
+      from public.shipments s
       join public.farmer_accounts fa
         on fa.auth_user_id = auth.uid()
        and fa.is_active = true
-      where t.id = public.trip_id_from_storage_name(obj_name)
-        and fa.farmer_id = t.farmer_id
+      where s.id::text = public.shipment_id_from_storage_name(obj_name)
+        and fa.farmer_id = s.farmer_id
     );
 $$;
 
@@ -80,7 +80,7 @@ alter table public.farms enable row level security;
 alter table public.farmer_accounts enable row level security;
 alter table public.settings enable row level security;
 alter table public.global_prices enable row level security;
-alter table public.trips enable row level security;
+alter table public.shipments enable row level security;
 alter table public.farm_expenses enable row level security;
 alter table public.vehicle_expenses enable row level security;
 alter table public.attendance enable row level security;
@@ -164,18 +164,13 @@ for select
 to authenticated
 using (public.current_farmer_account() is not null);
 
--- trips
-drop policy if exists trips_admin_all on public.trips;
-drop policy if exists trips_farmer_read on public.trips;
-create policy trips_admin_all on public.trips
+-- shipments
+drop policy if exists shipments_access on public.shipments;
+create policy shipments_access on public.shipments
 for all
 to authenticated
-using (public.is_admin_user())
-with check (public.is_admin_user());
-create policy trips_farmer_read on public.trips
-for select
-to authenticated
-using (public.can_access_farmer_row(farmer_id, farm_id));
+using (public.is_admin_user() or public.can_access_farmer_row(farmer_id, farm_id))
+with check (public.is_admin_user() or public.can_access_farmer_row(farmer_id, farm_id));
 
 -- farm_expenses
 drop policy if exists farm_expenses_admin_all on public.farm_expenses;
