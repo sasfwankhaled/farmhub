@@ -161,8 +161,9 @@ export default function SettingsPage() {
   }, [shipments]);
 
   const transportStats = useMemo(() => {
-    const totalPackages = shipments.reduce((sum, s) => sum + (s.packagesCount || 0), 0);
-    const totalRevenue = shipments.reduce((sum, s) => sum + (s.boxRentalTotal || 0), 0);
+    const validTransports = shipments.filter(s => ['collected', 'farmer_delivered', 'archived'].includes(s.status));
+    const totalPackages = validTransports.reduce((sum, s) => sum + (s.packagesCount || 0), 0);
+    const totalRevenue = validTransports.reduce((sum, s) => sum + (s.boxRentalTotal || 0), 0);
     const totalExpenses = vehicleExpenses.reduce((sum, v) => sum + (v.cost || 0), 0);
     return {
       totalPackages,
@@ -1822,6 +1823,81 @@ export default function SettingsPage() {
                    <button className="p-3 text-blue-600 hover:bg-blue-50 rounded-2xl border border-blue-100 transition-all flex items-center gap-2 font-black text-xs" title="تصدير بصيغة PDF">
                      <FileDown className="w-4 h-4" /> تصدير التقرير الحالي
                    </button>
+                </div>
+              </div>
+
+              {/* Report Filters (For Scoping Metrics) */}
+              <div className="bg-white p-6 rounded-[2.5rem] shadow-lg shadow-gray-200/50 border border-gray-100 space-y-5 animate-in fade-in duration-500 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full blur-3xl" />
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 text-gray-900 font-black mb-4">
+                    <Filter className="w-5 h-5 text-blue-600" />
+                    <span>فلاتر ومحددات التقرير الشامل</span>
+                    <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded-md ml-auto">ينعكس فوراً على جميع الأرقام بالأسفل</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="relative">
+                      <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="بحث برقم الشحنة..."
+                        value={archiveSearch}
+                        onChange={(e) => setArchiveSearch(e.target.value)}
+                        className="w-full pr-11 pl-4 py-3.5 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-blue-300 outline-none text-sm font-bold shadow-inner transition-all"
+                      />
+                    </div>
+
+                    <select
+                      value={archiveFarmerFilter}
+                      onChange={(e) => setArchiveFarmerFilter(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-gray-50 border border-transparent rounded-2xl outline-none text-sm focus:bg-white focus:border-blue-300 shadow-inner font-bold"
+                    >
+                      <option value="all">كل المزارعين (الفلتر الشامل)</option>
+                      {farmers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </select>
+
+                    <select
+                      value={archiveMerchantFilter}
+                      onChange={(e) => setArchiveMerchantFilter(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-gray-50 border border-transparent rounded-2xl outline-none text-sm focus:bg-white focus:border-blue-300 shadow-inner font-bold"
+                    >
+                      <option value="all">كل التجار (الفلتر الشامل)</option>
+                      {entities.filter(e => normalizeEntityType(e.type as string) === 'merchant').map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+
+                    <select
+                      value={archiveCropFilter}
+                      onChange={(e) => setArchiveCropFilter(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-gray-50 border border-transparent rounded-2xl outline-none text-sm focus:bg-white focus:border-blue-300 shadow-inner font-bold"
+                    >
+                      <option value="all">كل المحاصيل (الفلتر الشامل)</option>
+                      {crops.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 mt-4">
+                    <div className="flex items-center gap-3 bg-gray-50/80 p-2.5 rounded-2xl border border-gray-100 focus-within:border-blue-400 focus-within:bg-white transition-all shadow-inner">
+                      <div className="p-2.5 bg-white rounded-[1rem] shadow-sm"><Calendar className="w-5 h-5 text-blue-500" /></div>
+                      <label className="text-xs font-black text-gray-500 uppercase tracking-widest whitespace-nowrap w-20">من تاريخ</label>
+                      <input
+                        type="date"
+                        value={archiveStartDate}
+                        onChange={(e) => setArchiveStartDate(e.target.value)}
+                        className="flex-1 bg-transparent border-none outline-none text-lg font-black text-gray-800"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 bg-gray-50/80 p-2.5 rounded-2xl border border-gray-100 focus-within:border-blue-400 focus-within:bg-white transition-all shadow-inner">
+                      <div className="p-2.5 bg-white rounded-[1rem] shadow-sm"><Calendar className="w-5 h-5 text-blue-500" /></div>
+                      <label className="text-xs font-black text-gray-500 uppercase tracking-widest whitespace-nowrap w-20">إلى تاريخ</label>
+                      <input
+                        type="date"
+                        value={archiveEndDate}
+                        onChange={(e) => setArchiveEndDate(e.target.value)}
+                        className="flex-1 bg-transparent border-none outline-none text-lg font-black text-gray-800"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
