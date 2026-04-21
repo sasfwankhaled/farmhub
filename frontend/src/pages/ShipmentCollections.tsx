@@ -193,7 +193,7 @@ export default function ShipmentCollectionsPage() {
       if (receiptFile) {
         let fileToUpload = receiptFile;
         try {
-          const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+          const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1280, useWebWorker: true };
           fileToUpload = await imageCompression(receiptFile, options);
         } catch (e) {
           console.warn("Compression failed, using original file", e);
@@ -800,11 +800,12 @@ export default function ShipmentCollectionsPage() {
                       </div>
                     ) : (
                       <button onClick={() => receiptRef.current?.click()}
-                        className="w-full h-40 border-2 border-dashed border-gray-300 rounded-[1.5rem] hover:border-blue-400 hover:bg-blue-50 transition-all font-bold text-gray-400 hover:text-blue-600 flex flex-col justify-center items-center gap-3">
-                        <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 group-hover:border-blue-200 transition-all">
-                           <Camera className="w-8 h-8 opacity-70" />
-                        </div>
-                        <span className="text-xs">اضغط للتصوير أو تصفح الصور</span>
+                        className="w-full h-48 border-2 border-dashed border-gray-300 rounded-[2.5rem] hover:border-indigo-400 hover:bg-indigo-50 transition-all font-bold text-gray-400 hover:text-indigo-600 flex flex-col justify-center items-center gap-3 group bg-white shadow-sm">
+                         <div className="bg-indigo-600 p-4 rounded-full shadow-lg group-hover:scale-110 transition-transform mb-2">
+                            <Camera className="w-10 h-10 text-white" />
+                         </div>
+                         <span className="text-sm font-black text-indigo-600">التقاط صورة الفاتورة الآن</span>
+                         <span className="text-[10px] text-gray-400">أو انقر هنا لاختيار ملف موجود من المعرض</span>
                       </button>
                     )}
                     <input ref={receiptRef} type="file" accept="image/*" capture="environment" onChange={handleReceiptChange} className="hidden" />

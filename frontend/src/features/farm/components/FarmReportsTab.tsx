@@ -136,8 +136,11 @@ export const FarmReportsTab = ({
                 <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ paddingBottom: '20px' }} />
                 
                 {/* The visualization */}
-                <Bar yAxisId="left" dataKey="production" name="الإنتاج" fill="url(#colorProd)" radius={[4, 4, 0, 0]} barSize={24} />
-                <Area yAxisId="right" type="monotone" dataKey="sales" name="المبيعات" stroke="#16a34a" strokeWidth={3} fill="url(#colorSales)" activeDot={{ r: 6, strokeWidth: 0, fill: '#16a34a' }} />
+                <Bar yAxisId="left" dataKey="production" name="الإنتاج اليومي" fill="url(#colorProd)" radius={[4, 4, 0, 0]} barSize={24} />
+                <Area yAxisId="right" type="monotone" dataKey="sales" name="المبيعات (₪)" stroke="#16a34a" strokeWidth={3} fill="url(#colorSales)" activeDot={{ r: 6, strokeWidth: 0, fill: '#16a34a' }} />
+                
+                {/* Cumulative Growth Line */}
+                <Area yAxisId="left" type="stepAfter" dataKey="cumulativeProduction" name="تراكم الإنتاج" stroke="#f59e0b" strokeWidth={2} fillOpacity={0.05} fill="#f59e0b" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>

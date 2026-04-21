@@ -55,9 +55,19 @@ export const useFarmAnalytics = ({
     const deliveryIncome = shipments
       .filter((s) => s.status !== 'loaded')
       .reduce((sum, s) => {
-        const rental = asNumber(s.boxRentalTotal);
-        if (rental > 0) return sum + rental;
-        return sum + ((s.packagesCount || 0) * asNumber(s.boxRentalPerUnit));
+        const rentalTotal = asNumber(s.boxRentalTotal);
+        if (rentalTotal > 0) return sum + rentalTotal;
+        
+        const rentalPerUnit = asNumber(s.boxRentalPerUnit);
+        const pkgCount = asNumber(s.packagesCount);
+        
+        if (rentalPerUnit > 0) {
+          return sum + (pkgCount * rentalPerUnit);
+        }
+        
+        // Fallback to settings or global prices if available
+        const fallbackPrice = asNumber(settings?.transportFeePerUnit);
+        return sum + (pkgCount * fallbackPrice);
       }, 0);
 
     return {

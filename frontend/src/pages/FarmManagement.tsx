@@ -216,7 +216,11 @@ export default function FarmManagementPage() {
          r.sales += isFarmerReadonly ? (s.farmerNetAmount || 0) : (s.totalSaleAmount || 0);
        }
     });
-    return Array.from(map.values());
+    let cumulative = 0;
+    return Array.from(map.values()).map(point => {
+      cumulative += point.production;
+      return { ...point, cumulativeProduction: cumulative };
+    });
   })();
 
   // ── Utility functions ─────────────────────────────────────────────────
