@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, type FormEvent } from 'react';
+import { useState, useMemo, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { 
@@ -26,26 +26,22 @@ import {
   Moon
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
-import { subscribeToCollection, createDocument, getDocument } from '../services/db';
-import { Shipment, Crop, VehicleExpense, Entity, Attendance, FarmExpense, Settings, GlobalPrice, WorkerPayment } from '../types';
+import { createDocument } from '../services/db';
+import { VehicleExpense } from '../types';
 import { Link } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { useFarmAnalytics } from '../hooks/useFarmAnalytics';
 import { StatCardPrimary } from '../components/shared/StatCardPrimary';
 import { PipelineStage } from '../components/shared/PipelineStage';
 import { ActionWidget } from '../components/shared/ActionWidget';
+import { useData } from '../contexts/DataContext';
 
 export default function Dashboard() {
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [crops, setCrops] = useState<Crop[]>([]);
-  const [vehicleExpenses, setVehicleExpenses] = useState<VehicleExpense[]>([]);
-  const [entities, setEntities] = useState<Entity[]>([]);
-  const [attendance, setAttendance] = useState<Attendance[]>([]);
-  const [farmExpenses, setFarmExpenses] = useState<FarmExpense[]>([]);
-  const [workerPayments, setWorkerPayments] = useState<WorkerPayment[]>([]);
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [globalPrices, setGlobalPrices] = useState<GlobalPrice[]>([]);
-  
+  const {
+    shipments, crops, vehicleExpenses, entities,
+    attendance, farmExpenses, workerPayments, settings, globalPrices
+  } = useData();
+
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [merchantFilter, setMerchantFilter] = useState<string>('all');
 
@@ -62,29 +58,6 @@ export default function Dashboard() {
   });
 
   const DAYS = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
-
-  useEffect(() => {
-    const unsubShipments = subscribeToCollection<Shipment>('shipments', setShipments);
-    const unsubCrops = subscribeToCollection<Crop>('crops', setCrops);
-    const unsubExpenses = subscribeToCollection<VehicleExpense>('vehicle_expenses', setVehicleExpenses);
-    const unsubEntities = subscribeToCollection<Entity>('entities', setEntities);
-    const unsubAttendance = subscribeToCollection<Attendance>('attendance', setAttendance);
-    const unsubFarmExpenses = subscribeToCollection<FarmExpense>('farm_expenses', setFarmExpenses);
-    const unsubWorkerPayments = subscribeToCollection<WorkerPayment>('worker_payments', setWorkerPayments);
-    const unsubPrices = subscribeToCollection<GlobalPrice>('global_prices', setGlobalPrices);
-    getDocument<Settings>('settings', 'global').then(setSettings);
-
-    return () => {
-      unsubShipments();
-      unsubCrops();
-      unsubExpenses();
-      unsubEntities();
-      unsubAttendance();
-      unsubFarmExpenses();
-      unsubWorkerPayments();
-      unsubPrices();
-    };
-  }, []);
 
   const handleAddExpense = async (e: FormEvent) => {
     e.preventDefault();

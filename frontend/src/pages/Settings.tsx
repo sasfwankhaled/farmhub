@@ -40,12 +40,10 @@ import {
   FileDown
 } from 'lucide-react';
 import { 
-  subscribeToCollection, 
   createDocument, 
   updateDocument, 
   deleteDocument,
-  getDocument,
-  getCollection
+  getDocument
 } from '../services/db';
 import { resolveReceiptUrl } from '../services/storage';
 import { ensureFarmerAuthUser } from '../services/adminAuth';
@@ -53,6 +51,7 @@ import { Entity, Crop, Settings as SettingsType, GlobalPrice, Farm, FarmerAccoun
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 import { isAllowedAdminEmail } from '../lib/authz';
 import { supabase } from '../supabase';
+import { useData } from '../contexts/DataContext';
 
 const normalizeEntityType = (type?: string) => {
   const value = (type || '').toString().trim().toLowerCase();
@@ -63,21 +62,14 @@ const normalizeEntityType = (type?: string) => {
 };
 
 export default function SettingsPage() {
-  const [entities, setEntities] = useState<Entity[]>([]);
-  const [crops, setCrops] = useState<Crop[]>([]);
-  const [farms, setFarms] = useState<Farm[]>([]);
-  const [farmerAccounts, setFarmerAccounts] = useState<FarmerAccount[]>([]);
-  const [globalPrices, setGlobalPrices] = useState<GlobalPrice[]>([]);
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [settings, setSettings] = useState<SettingsType>({
-    boxPrice: 0,
-    waterPrice: 0,
-    transportFeePerUnit: 0
-  });
+  const {
+    entities, crops, farms, farmerAccounts, globalPrices, shipments, vehicleExpenses, settings: ctxSettings
+  } = useData();
+  const settings: SettingsType = ctxSettings || { boxPrice: 0, waterPrice: 0, transportFeePerUnit: 0 };
 
-  const [vehicleExpenses, setVehicleExpenses] = useState<VehicleExpense[]>([]);
   const [activeTab, setActiveTab] = useState<'prices' | 'farms' | 'entities' | 'crops' | 'archive' | 'transport' | 'reports'>('prices');
   const [activeReportSubTab, setActiveReportSubTab] = useState<'merchants' | 'farmers' | 'summary'>('summary');
+
 
   // Archive Specific States
   const [archiveSearch, setArchiveSearch] = useState('');
@@ -327,31 +319,6 @@ export default function SettingsPage() {
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [shipments, entities, crops, archiveSearch, archiveFarmerFilter, archiveMerchantFilter, archiveCropFilter, archiveStartDate, archiveEndDate]);
-
-  useEffect(() => {
-    const unsubEntities = subscribeToCollection<Entity>('entities', setEntities);
-    const unsubCrops = subscribeToCollection<Crop>('crops', setCrops);
-    const unsubPrices = subscribeToCollection<GlobalPrice>('global_prices', setGlobalPrices);
-    const unsubFarms = subscribeToCollection<Farm>('farms', setFarms);
-    const unsubShipments = subscribeToCollection<Shipment>('shipments', setShipments);
-    const unsubAccounts = subscribeToCollection<FarmerAccount>('farmer_accounts', setFarmerAccounts);
-    const unsubVExpenses = subscribeToCollection<VehicleExpense>('vehicle_expenses', (data) => setVehicleExpenses(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())));
-    
-    // Load settings (legacy)
-    getDocument<SettingsType>('settings', 'global').then(data => {
-      if (data) setSettings(data);
-    });
-
-    return () => {
-      unsubEntities();
-      unsubCrops();
-      unsubPrices();
-      unsubFarms();
-      unsubShipments();
-      unsubAccounts();
-      unsubVExpenses();
-    };
-  }, []);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -658,16 +625,10 @@ export default function SettingsPage() {
 
       if (editingFarmerAccountId) {
         await updateDocument('farmer_accounts', editingFarmerAccountId, payload);
-        setFarmerAccounts((prev) =>
-          prev.map((acc) => (acc.id === editingFarmerAccountId ? ({ ...acc, ...payload } as FarmerAccount) : acc))
-        );
         toast.success('تم تحديث حساب المزارع بنجاح');
       } else {
-        const createdId = await createDocument('farmer_accounts', payload);
-        if (createdId) {
-          setFarmerAccounts((prev) => [{ ...(payload as FarmerAccount), id: createdId }, ...prev]);
-        }
-        toast.success('تم إنشاء حساب المزارع بنجاح');
+        await createDocument('farmer_accounts', payload);
+        toast.success('تم إنشاء حساب المزارع بنجاد');
       }
       setIsAddingFarmerAccount(false);
       setEditingFarmerAccountId(null);
@@ -688,7 +649,6 @@ export default function SettingsPage() {
   const handleDeleteFarmerAccount = async (id: string) => {
     try {
       await deleteDocument('farmer_accounts', id);
-      setFarmerAccounts((prev) => prev.filter((acc) => acc.id !== id));
       toast.success('تم حذف الحساب بنجاح');
     } catch (error) {
       toast.error('حدث خطأ أثناء حذف الحساب');

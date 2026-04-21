@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -7,9 +7,10 @@ import {
   Search, Calendar, Edit2, Trash2, X,
   ArrowLeft, Users
 } from 'lucide-react';
-import { subscribeToCollection, createDocument, updateDocument, deleteDocument, getCollection, getDocument } from '../services/db';
+import { createDocument, updateDocument, deleteDocument, getDocument } from '../services/db';
 import { Shipment, ShipmentStatus, Entity, Crop, Farm, Settings, GlobalPrice } from '../types';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
+import { useData } from '../contexts/DataContext';
 
 const DAYS = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
 
@@ -23,13 +24,11 @@ const STATUS_CONFIG: Record<ShipmentStatus, { label: string; color: string; bg: 
 
 export default function ShipmentsPage() {
   const navigate = useNavigate();
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [entities, setEntities] = useState<Entity[]>([]);
-  const [crops, setCrops] = useState<Crop[]>([]);
-  const [farms, setFarms] = useState<Farm[]>([]);
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [globalPrices, setGlobalPrices] = useState<GlobalPrice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { shipments: rawShipments, entities, crops, farms, settings, globalPrices } = useData();
+  const sortByDate = (data: Shipment[]) =>
+    [...data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const shipments = sortByDate(rawShipments);
+  const [loading, setLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -51,36 +50,6 @@ export default function ShipmentsPage() {
     status: 'loaded',
     boxRentalPerUnit: 0,
   });
-
-  const sortByDate = (data: Shipment[]) =>
-    [...data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  useEffect(() => {
-    // Load initial data directly (more reliable than realtime-only)
-    Promise.all([
-      getCollection<Shipment>('shipments'),
-      getCollection<Entity>('entities'),
-      getCollection<Crop>('crops'),
-      getCollection<Farm>('farms'),
-      getDocument<Settings>('settings', 'global'),
-      getCollection<GlobalPrice>('global_prices'),
-    ]).then(([s, e, c, f, st, p]) => {
-      if (s) setShipments(sortByDate(s));
-      if (e) setEntities(e);
-      if (c) setCrops(c);
-      if (f) setFarms(f);
-      if (st) setSettings(st);
-      if (p) setGlobalPrices(p);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-
-    // Then subscribe for real-time updates
-    const u1 = subscribeToCollection<Shipment>('shipments', (data) => setShipments(sortByDate(data)));
-    const u2 = subscribeToCollection<Entity>('entities', setEntities);
-    const u3 = subscribeToCollection<Crop>('crops', setCrops);
-    const u4 = subscribeToCollection<Farm>('farms', setFarms);
-    return () => { u1(); u2(); u3(); u4(); };
-  }, []);
 
   const farmers = entities.filter(e => e.type === 'farmer');
   const merchants = entities.filter(e => e.type === 'merchant');

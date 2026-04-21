@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   Users, DollarSign, CheckCircle2, Package, Archive,
   TrendingDown, TrendingUp, ChevronDown, ChevronUp, Eye, X
 } from 'lucide-react';
-import { subscribeToCollection, updateDocument } from '../services/db';
+import { updateDocument } from '../services/db';
 import { Shipment, Entity, Crop } from '../types';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 import { supabase } from '../supabase';
 import { resolveReceiptUrl } from '../services/storage';
+import { useData } from '../contexts/DataContext';
 
 interface FarmerGroup {
   farmer: Entity;
@@ -21,28 +22,15 @@ interface FarmerGroup {
 }
 
 export default function FarmerDeliveryPage() {
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [entities, setEntities] = useState<Entity[]>([]);
-  const [crops, setCrops] = useState<Crop[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { shipments: allShipments, entities, crops } = useData();
+  const shipments = allShipments.filter(sh => sh.status === 'collected');
+
   const [expandedFarmers, setExpandedFarmers] = useState<Set<string>>(new Set());
   const [deliveringFarmerId, setDeliveringFarmerId] = useState<string | null>(null);
   const [confirmNote, setConfirmNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewReceipt, setPreviewReceipt] = useState<string | null>(null);
   const [isImageLoading, setIsImageLoading] = useState(false);
-
-  useEffect(() => {
-    // Then subscribe for real-time updates
-    const u1 = subscribeToCollection<Shipment>('shipments', (data) => {
-      setShipments(data.filter(sh => sh.status === 'collected'));
-      setLoading(false);
-    });
-    const u2 = subscribeToCollection<Entity>('entities', setEntities);
-    const u3 = subscribeToCollection<Crop>('crops', setCrops);
-
-    return () => { u1(); u2(); u3(); };
-  }, []);
 
   const farmers = entities.filter(e => e.type === 'farmer');
   const merchants = entities.filter(e => e.type === 'merchant');
@@ -142,12 +130,7 @@ export default function FarmerDeliveryPage() {
       </div>
 
       {/* Farmer cards */}
-      {loading ? (
-        <div className="bg-white rounded-3xl p-16 text-center border border-gray-100">
-          <div className="w-10 h-10 border-4 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 font-bold">جاري التحميل...</p>
-        </div>
-      ) : farmerGroups.length === 0 ? (
+      {farmerGroups.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-gray-200 p-16 text-center">
           <Archive className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-lg font-bold text-gray-700">لا توجد شحنات بانتظار التسليم</p>

@@ -7,10 +7,11 @@ import {
 } from 'lucide-react';
 import { useFarmAnalytics } from '../hooks/useFarmAnalytics';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
-import { subscribeToCollection, createDocument, updateDocument, deleteDocument, getDocument } from '../services/db';
+import { createDocument, updateDocument, deleteDocument, getDocument } from '../services/db';
 import { FarmExpense, Shipment, Entity, Attendance, WorkerPayment, Crop, Farm, GlobalPrice, Settings } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
+import { useData } from '../contexts/DataContext';
 
 import { FarmSummaryTab } from '../features/farm/components/FarmSummaryTab';
 import { FarmExpensesTab } from '../features/farm/components/FarmExpensesTab';
@@ -23,16 +24,10 @@ export default function FarmManagementPage() {
   const { farmerSession } = useAuth();
   const isFarmerReadonly = !!farmerSession;
 
-  // ── Admin-only state (loaded via subscribeToCollection) ──────────────
-  const [farmExpenses, setFarmExpenses] = useState<FarmExpense[]>([]);
-  const [attendance, setAttendance] = useState<Attendance[]>([]);
-  const [workerPayments, setWorkerPayments] = useState<WorkerPayment[]>([]);
-  const [entities, setEntities] = useState<Entity[]>([]);
-  const [crops, setCrops] = useState<Crop[]>([]);
-  const [farms, setFarms] = useState<Farm[]>([]);
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [globalPrices, setGlobalPrices] = useState<GlobalPrice[]>([]);
-  const [settings, setSettings] = useState<Settings | null>(null);
+  // ── Admin data from Global Context ────────────────────────────────────
+  const {
+    farmExpenses, attendance, workerPayments, entities, crops, farms, globalPrices, shipments, settings
+  } = useData();
 
   // ── Farmer-only state (loaded via SECURITY DEFINER RPC) ─────────────
   const [farmerData, setFarmerData] = useState<any>(null);
@@ -56,21 +51,6 @@ export default function FarmManagementPage() {
   const [newAttendance, setNewAttendance] = useState<Partial<Attendance>>({ date: new Date().toISOString().split('T')[0], day: '', startTime: '07:00', endTime: '16:00' });
   const [newPayment, setNewPayment] = useState<Partial<WorkerPayment>>({ date: new Date().toISOString().split('T')[0], day: '', amount: 0 });
   const [bulkAttendance, setBulkAttendance] = useState({ date: new Date().toISOString().split('T')[0], day: '', startTime: '07:00', endTime: '15:00', selectedWorkerIds: [] as string[] });
-
-  // ── Effect: Admins subscribe to collections ───────────────────────────
-  useEffect(() => {
-    if (isFarmerReadonly) return; // Farmers do NOT use subscribeToCollection at all
-    const u1 = subscribeToCollection<FarmExpense>('farm_expenses', (d) => setFarmExpenses(d.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())));
-    const u2 = subscribeToCollection<Attendance>('attendance', (d) => setAttendance(d.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())));
-    const u3 = subscribeToCollection<WorkerPayment>('worker_payments', (d) => setWorkerPayments(d.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())));
-    const u4 = subscribeToCollection<Entity>('entities', setEntities);
-    const u5 = subscribeToCollection<Crop>('crops', setCrops);
-    const u6 = subscribeToCollection<Farm>('farms', setFarms);
-    const u7 = subscribeToCollection<GlobalPrice>('global_prices', setGlobalPrices);
-    const u8 = subscribeToCollection<Shipment>('shipments', (d) => setShipments(d.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())));
-    getDocument<Settings>('settings', 'global').then(st => { if (st) setSettings(st); });
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); };
-  }, [isFarmerReadonly]);
 
   // ── Effect: Persist selectedFarmId for admins only ────────────────────
   useEffect(() => {

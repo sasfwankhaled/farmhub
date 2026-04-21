@@ -13,6 +13,7 @@ import { FarmerAccount } from './types';
 import { supabase } from './supabase';
 
 import { AuthContext } from './contexts/AuthContext';
+import { DataProvider } from './contexts/DataContext';
 import { Navigation } from './components/layout/Navigation';
 import { Login } from './pages/auth/Login';
 
@@ -231,6 +232,7 @@ export default function App() {
             <Login />
           </div>
         ) : (
+          <DataProvider isAdminMode={!farmerSession}>
           <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row-reverse" dir="rtl">
             <Navigation />
             <main className="flex-1 w-full max-w-full overflow-x-hidden lg:mr-64 lg:w-[calc(100%-16rem)] p-4 sm:p-6 lg:p-8">
@@ -261,6 +263,7 @@ export default function App() {
               </Suspense>
             </main>
           </div>
+          </DataProvider>
         )}
       </Router>
     </AuthContext.Provider>

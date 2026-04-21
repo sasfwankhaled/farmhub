@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, type ChangeEvent } from 'react';
+import React, { useState, useRef, useMemo, type ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -6,25 +6,24 @@ import {
   Truck, Camera, Image, Calculator, ChevronDown, Users, Calendar,
   TrendingUp, Wallet, Star, Search, SlidersHorizontal
 } from 'lucide-react';
-import { getCollection, subscribeToCollection, updateDocument, getDocument } from '../services/db';
+import { updateDocument, getDocument } from '../services/db';
 import { Shipment, SaleBatch, Entity, Crop, Settings, GlobalPrice } from '../types';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 import { supabase } from '../supabase';
 import { buildReceiptPath } from '../services/storage';
 import imageCompression from 'browser-image-compression';
+import { useData } from '../contexts/DataContext';
 
 export default function ShipmentCollectionsPage() {
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [entities, setEntities] = useState<Entity[]>([]);
-  const [crops, setCrops] = useState<Crop[]>([]);
-  const [loading, setLoading] = useState(true);
-  
+  const { shipments: allShipments, entities, crops, globalPrices, settings } = useData();
+  const shipments = allShipments
+    .filter(sh => sh.status === 'delivered_to_merchant')
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
   // Modal & Selection State
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [collectingShipments, setCollectingShipments] = useState<Shipment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [globalPrices, setGlobalPrices] = useState<GlobalPrice[]>([]);
   const receiptRef = useRef<HTMLInputElement>(null);
 
   // Filter state
@@ -49,36 +48,8 @@ export default function ShipmentCollectionsPage() {
   const [totalOverride, setTotalOverride] = useState('');
 
   // Bulk Collection specific state
-  const [bulkSaleValues, setBulkSaleValues] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    // Load initial data
-    Promise.all([
-      getCollection<Entity>('entities'),
-      getCollection<Crop>('crops'),
-      getCollection<GlobalPrice>('global_prices'),
-      getDocument<Settings>('settings', 'global'),
-    ]).then(([e, c, p, st]) => {
-      if (e) setEntities(e);
-      if (c) setCrops(c);
-      if (p) setGlobalPrices(p);
-      if (st) setSettings(st);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-
-    // Real-time subscriptions
-    const u1 = subscribeToCollection<Shipment>('shipments', (data) => {
-      setShipments(
-        data
-          .filter(sh => sh.status === 'delivered_to_merchant')
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      );
-    });
-    const u2 = subscribeToCollection<Entity>('entities', setEntities);
-    const u3 = subscribeToCollection<Crop>('crops', setCrops);
-
-    return () => { u1(); u2(); u3(); };
-  }, []);
+  const [bulkSaleValues, setBulkSaleValues] = useState<Record<string, string>>({}); 
+  const [loading] = useState(false);
 
   const farmers = entities.filter(e => e.type === 'farmer');
   const merchants = entities.filter(e => e.type === 'merchant');
