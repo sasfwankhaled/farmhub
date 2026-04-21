@@ -54,7 +54,11 @@ export const useFarmAnalytics = ({
 
     const deliveryIncome = shipments
       .filter((s) => s.status !== 'loaded')
-      .reduce((sum, s) => sum + asNumber(s.boxRentalTotal), 0);
+      .reduce((sum, s) => {
+        const rental = asNumber(s.boxRentalTotal);
+        if (rental > 0) return sum + rental;
+        return sum + ((s.packagesCount || 0) * asNumber(s.boxRentalPerUnit));
+      }, 0);
 
     return {
       totalProduction,
