@@ -1,5 +1,5 @@
 import { formatCurrency, cn } from '../../../lib/utils';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell, LineChart, Line } from 'recharts';
+import { ComposedChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 import { Printer, TrendingUp, Package, Wallet, PieChart, Activity } from 'lucide-react';
 
 interface Props {
@@ -75,24 +75,70 @@ export const FarmReportsTab = ({
         </div>
         
         {timelineData.length > 0 ? (
-          <div className="w-full h-[300px]" style={{ display: 'block', position: 'relative' }}>
+          <div className="w-full h-[350px]" style={{ display: 'block', position: 'relative' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={timelineData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
-                <XAxis dataKey="date" tick={{ fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="left" orientation="left" stroke="#2563eb" hide />
-                <YAxis yAxisId="right" orientation="right" stroke="#16a34a" hide />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }}
-                  formatter={(value: number, name: string) => [
-                    name === 'sales' ? formatCurrency(value) : value, 
-                    name === 'sales' ? 'المبيعات' : 'الإنتاج'
-                  ]}
+              <ComposedChart data={timelineData} margin={{ top: 20, right: 20, left: 20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#16a34a" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#16a34a" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorProd" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                <XAxis 
+                   dataKey="date" 
+                   tick={{ fontSize: 11, fontWeight: 'bold', fill: '#6b7280' }} 
+                   axisLine={false} 
+                   tickLine={false} 
+                   tickFormatter={(val) => {
+                     const d = new Date(val);
+                     return `${d.getDate()} / ${d.getMonth() + 1}`;
+                   }}
                 />
-                <Legend verticalAlign="top" height={36} iconType="circle" />
-                <Line yAxisId="left" type="monotone" dataKey="production" name="الإنتاج" stroke="#2563eb" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
-                <Line yAxisId="right" type="monotone" dataKey="sales" name="المبيعات" stroke="#16a34a" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
-              </LineChart>
+                
+                {/* Left Axis for Production (Bar) */}
+                <YAxis 
+                   yAxisId="left" 
+                   orientation="left" 
+                   tick={{ fontSize: 11, fontWeight: 'bold', fill: '#3b82f6' }} 
+                   axisLine={false} 
+                   tickLine={false}
+                   tickFormatter={(val) => `${val} طرد`}
+                />
+                
+                {/* Right Axis for Sales (Area) */}
+                <YAxis 
+                   yAxisId="right" 
+                   orientation="right" 
+                   tick={{ fontSize: 11, fontWeight: 'bold', fill: '#16a34a' }} 
+                   axisLine={false} 
+                   tickLine={false}
+                   tickFormatter={(val) => `₪${val}`}
+                />
+                
+                <Tooltip 
+                  cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                  contentStyle={{ borderRadius: '1rem', border: '1px solid #f3f4f6', boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.1)', fontWeight: 'bold', padding: '12px 16px' }}
+                  labelStyle={{ color: '#9ca3af', marginBottom: '8px', fontSize: '12px' }}
+                  formatter={(value: number, name: string) => [
+                    name === 'sales' ? formatCurrency(value) : `${value} طرد`, 
+                    name === 'sales' ? 'إجمالي المبيعات' : 'حجم الإنتاج'
+                  ]}
+                  labelFormatter={(label) => {
+                     const d = new Date(label as string);
+                     return d.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                  }}
+                />
+                <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ paddingBottom: '20px' }} />
+                
+                {/* The visualization */}
+                <Bar yAxisId="left" dataKey="production" name="الإنتاج" fill="url(#colorProd)" radius={[4, 4, 0, 0]} barSize={24} />
+                <Area yAxisId="right" type="monotone" dataKey="sales" name="المبيعات" stroke="#16a34a" strokeWidth={3} fill="url(#colorSales)" activeDot={{ r: 6, strokeWidth: 0, fill: '#16a34a' }} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         ) : (
