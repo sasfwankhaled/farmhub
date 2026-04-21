@@ -24,6 +24,7 @@ export const FarmSummaryTab = ({
   entities
 }: Props) => {
   const [selectedShipmentForModal, setSelectedShipmentForModal] = useState<Shipment | null>(null);
+  const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -160,7 +161,7 @@ export const FarmSummaryTab = ({
                           <button 
                             onClick={() => {
                               const { data } = supabase.storage.from('receipts').getPublicUrl(shipment.receiptImageUrl!);
-                              window.open(data.publicUrl, '_blank');
+                              setViewingReceiptUrl(data.publicUrl);
                             }}
                             className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
                             title="عرض الفاتورة"
@@ -279,7 +280,7 @@ export const FarmSummaryTab = ({
                     <button 
                       onClick={() => {
                         const { data } = supabase.storage.from('receipts').getPublicUrl(shipment.receiptImageUrl!);
-                        window.open(data.publicUrl, '_blank');
+                        setViewingReceiptUrl(data.publicUrl);
                       }}
                       className="p-3.5 bg-green-50 text-green-600 rounded-2xl border border-green-100 hover:bg-green-100 transition-colors"
                     >
@@ -437,7 +438,7 @@ export const FarmSummaryTab = ({
                             />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                <button 
-                                 onClick={() => window.open(supabase.storage.from('receipts').getPublicUrl(selectedShipmentForModal.receiptImageUrl!).data.publicUrl, '_blank')}
+                                 onClick={() => setViewingReceiptUrl(supabase.storage.from('receipts').getPublicUrl(selectedShipmentForModal.receiptImageUrl!).data.publicUrl)}
                                  className="px-4 py-2 bg-white rounded-xl text-black font-black text-sm flex items-center gap-2"
                                >
                                   <ExternalLink className="w-4 h-4" /> عرض كامل
@@ -463,6 +464,23 @@ export const FarmSummaryTab = ({
                  </button>
               </div>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Lightbox Modal */}
+      <AnimatePresence>
+        {viewingReceiptUrl && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setViewingReceiptUrl(null)} className="absolute inset-0 bg-black/90 backdrop-blur-sm cursor-pointer" />
+             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative max-w-3xl w-full max-h-[90vh] flex flex-col z-10 pointer-events-none">
+                <div className="pointer-events-auto">
+                   <button onClick={() => setViewingReceiptUrl(null)} className="absolute -top-14 right-0 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors backdrop-blur-md">
+                      <X className="w-6 h-6" />
+                   </button>
+                   <img src={viewingReceiptUrl} alt="الفاتورة" className="w-full h-full max-h-[85vh] object-contain rounded-2xl" />
+                </div>
+             </motion.div>
           </div>
         )}
       </AnimatePresence>

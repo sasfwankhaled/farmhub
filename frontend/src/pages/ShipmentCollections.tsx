@@ -11,6 +11,7 @@ import { Shipment, SaleBatch, Entity, Crop, Settings, GlobalPrice } from '../typ
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 import { supabase } from '../supabase';
 import { buildReceiptPath } from '../services/storage';
+import imageCompression from 'browser-image-compression';
 
 export default function ShipmentCollectionsPage() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -38,6 +39,7 @@ export default function ShipmentCollectionsPage() {
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptPreview, setReceiptPreview] = useState('');
   const [notes, setNotes] = useState('');
+  const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
 
   // Single Collection specific state
   const [saleMethod, setSaleMethod] = useState<'kg' | 'box'>('box');
@@ -218,9 +220,17 @@ export default function ShipmentCollectionsPage() {
     try {
       let receiptUrl: string | undefined;
       if (receiptFile) {
+        let fileToUpload = receiptFile;
+        try {
+          const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+          fileToUpload = await imageCompression(receiptFile, options);
+        } catch (e) {
+          console.warn("Compression failed, using original file", e);
+        }
+
         // Use the first shipment id as the unique folder
-        const path = buildReceiptPath('shipment_receipts', collectingShipments[0].id, receiptFile.name);
-        const { error: upErr } = await supabase.storage.from('receipts').upload(path, receiptFile, { upsert: true });
+        const path = buildReceiptPath('shipment_receipts', collectingShipments[0].id, fileToUpload.name);
+        const { error: upErr } = await supabase.storage.from('receipts').upload(path, fileToUpload, { upsert: true });
         if (upErr) throw new Error('فشل رفع الفاتورة: ' + upErr.message);
         receiptUrl = path;
       }
@@ -806,7 +816,7 @@ export default function ShipmentCollectionsPage() {
                     <label className="text-sm font-black text-gray-700 mb-3 flex items-center gap-2">
                        <Camera className="w-5 h-5 text-blue-500" /> إثبات وصل التحصيل المجمع (اختياري)
                     </label>
-                    <p className="text-[10px] font-bold text-gray-400 mb-4 px-1">صورة واحدة تكفي لتوثيق التحصيل لجميع الشحنات المحددة.</p>
+                    <p className="text-[10px] font-bold text-gray-400 mb-4 px-1">سيتم ضغط الصورة تلقائياً وتسريع الرفع والتحصيل والتصفح من قبل المزارعين.</p>
                     {receiptPreview ? (
                       <div className="relative group rounded-[1.5rem] overflow-hidden border border-gray-200 shadow-inner">
                         <img src={receiptPreview} alt="الفاتورة" className="w-full h-40 object-cover bg-gray-50 group-hover:scale-105 transition-transform" />
@@ -826,7 +836,6 @@ export default function ShipmentCollectionsPage() {
                         <span className="text-xs">اضغط للتصوير أو تصفح الصور</span>
                       </button>
                     )}
-                    {/* KEY FEATURE: capture="environment" added for direct camera access on mobile */}
                     <input ref={receiptRef} type="file" accept="image/*" capture="environment" onChange={handleReceiptChange} className="hidden" />
                   </div>
 
@@ -847,10 +856,27 @@ export default function ShipmentCollectionsPage() {
               <div className="p-8 border-t border-gray-100 bg-white flex gap-4 shrink-0 shadow-[0_-10px_30px_#00000005] z-20">
                 <button onClick={handleCollect} disabled={isSubmitting}
                   className="flex-1 bg-green-600 text-white py-5 rounded-[1.5rem] font-black hover:bg-green-700 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:hover:translate-y-0 shadow-xl shadow-green-200/50 text-xl flex items-center justify-center gap-3">
-                  {isSubmitting ? 'جاري التوثيق والترحيل...' : `✅ تأكيد تحصيل ${collectingShipments.length > 1 ? 'مجمع' : 'الشحنة'}`}
+                  {isSubmitting ? 'جاري ضغط الفاتورة وتوثيق التحصيل...' : `✅ تأكيد تحصيل ${collectingShipments.length > 1 ? 'مجمع' : 'الشحنة'}`}
                 </button>
               </div>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Lightbox Modal */}
+      <AnimatePresence>
+        {viewingReceiptUrl && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setViewingReceiptUrl(null)} className="absolute inset-0 bg-black/90 backdrop-blur-sm cursor-pointer" />
+             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative max-w-3xl w-full max-h-[90vh] flex flex-col z-10 pointer-events-none">
+                <div className="pointer-events-auto">
+                   <button onClick={() => setViewingReceiptUrl(null)} className="absolute -top-14 right-0 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors backdrop-blur-md">
+                      <X className="w-6 h-6" />
+                   </button>
+                   <img src={viewingReceiptUrl} alt="الفاتورة" className="w-full h-full max-h-[85vh] object-contain rounded-2xl" />
+                </div>
+             </motion.div>
           </div>
         )}
       </AnimatePresence>
