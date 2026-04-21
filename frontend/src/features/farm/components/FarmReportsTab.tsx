@@ -1,6 +1,6 @@
 import { formatCurrency, cn } from '../../../lib/utils';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell } from 'recharts';
-import { Printer, TrendingUp, Package, Wallet, PieChart } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell, LineChart, Line } from 'recharts';
+import { Printer, TrendingUp, Package, Wallet, PieChart, Activity } from 'lucide-react';
 
 interface Props {
   selectedFarm: { name: string };
@@ -16,6 +16,7 @@ interface Props {
   totalFarmQuantity: number;
   expenseBreakdown: any[];
   cropReport: any[];
+  timelineData: any[];
 }
 
 export const FarmReportsTab = ({
@@ -31,7 +32,8 @@ export const FarmReportsTab = ({
   topCropBySales,
   totalFarmQuantity,
   expenseBreakdown,
-  cropReport
+  cropReport,
+  timelineData
 }: Props) => {
   const COLORS = ['#16a34a', '#2563eb', '#9333ea', '#f59e0b', '#ef4444'];
 
@@ -59,6 +61,50 @@ export const FarmReportsTab = ({
         <ReportMetricCard label="إجمالي المصاريف" value={formatCurrency(totalExpenses)} icon={Wallet} color="text-rose-600" bg="bg-rose-50" border="border-rose-100" />
         <ReportMetricCard label="صافي الربح" value={formatCurrency(netProfit)} icon={PieChart} color="text-purple-600" bg="bg-purple-50" border="border-purple-100" />
       </div>
+
+      {/* --- Growth Indicator Chart --- */}
+      <div className="p-8 rounded-[2rem] border border-gray-100 bg-white min-h-[400px] shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+            <span className="w-2 h-6 bg-indigo-500 rounded-full" />
+            مؤشر النمو الزمني (آخر 30 يوم)
+          </h3>
+          <div className="px-3 py-1 bg-indigo-50 text-indigo-600 font-black text-xs rounded-lg flex items-center gap-1 shadow-inner">
+            <Activity className="w-4 h-4" /> تطور الأداء
+          </div>
+        </div>
+        
+        {timelineData.length > 0 ? (
+          <div className="w-full h-[300px]" style={{ display: 'block', position: 'relative' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={timelineData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="left" orientation="left" stroke="#2563eb" hide />
+                <YAxis yAxisId="right" orientation="right" stroke="#16a34a" hide />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }}
+                  formatter={(value: number, name: string) => [
+                    name === 'sales' ? formatCurrency(value) : value, 
+                    name === 'sales' ? 'المبيعات' : 'الإنتاج'
+                  ]}
+                />
+                <Legend verticalAlign="top" height={36} iconType="circle" />
+                <Line yAxisId="left" type="monotone" dataKey="production" name="الإنتاج" stroke="#2563eb" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
+                <Line yAxisId="right" type="monotone" dataKey="sales" name="المبيعات" stroke="#16a34a" strokeWidth={4} dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="w-full h-[300px] flex items-center justify-center p-8 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+            <p className="text-gray-400 font-bold flex items-center gap-2">
+               <Activity className="w-5 h-5 text-gray-300" />
+               ننتظر تسجيل شحنات ومبيعات في آخر 30 يوماً لرسم مؤشر النمو.
+            </p>
+          </div>
+        )}
+      </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="p-8 rounded-[2rem] border border-gray-100 bg-gray-50/30 min-h-[450px]">

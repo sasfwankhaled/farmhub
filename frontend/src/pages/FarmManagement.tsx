@@ -51,7 +51,6 @@ export default function FarmManagementPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedWorkerForDetails, setSelectedWorkerForDetails] = useState<Entity | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [dbReport, setDbReport] = useState<any>(null);
 
   const [newFarmExpense, setNewFarmExpense] = useState<Partial<FarmExpense>>({ type: 'water', quantity: 0, cost: 0, date: new Date().toISOString().split('T')[0], day: '' });
   const [newAttendance, setNewAttendance] = useState<Partial<Attendance>>({ date: new Date().toISOString().split('T')[0], day: '', startTime: '07:00', endTime: '16:00' });
@@ -106,20 +105,6 @@ export default function FarmManagementPage() {
     }
   }, [selectedFarmId, isFarmerReadonly, fetchFarmerData]);
 
-  // ── Effect: Fetch analytics (dbReport) for ADMINS ────────────────────
-  useEffect(() => {
-    if (isFarmerReadonly || !selectedFarmId) { setDbReport(null); return; }
-    const fetch = async () => {
-      try {
-        const { data, error } = await supabase.rpc('fetch_farm_analytics', { f_id: selectedFarmId });
-        if (!error && data) setDbReport(data);
-      } catch (err) {
-        // Silence RPC errors as we have a local fallback
-        console.debug('RPC fetch_farm_analytics failed, using local fallback');
-      }
-    };
-    fetch();
-  }, [selectedFarmId, shipments, farmExpenses, attendance, workerPayments, isFarmerReadonly]);
 
   // ── Derived data: FARMER (from RPC, bypasses RLS) ────────────────────
   const farmerFarm = farmerData
@@ -176,8 +161,7 @@ export default function FarmManagementPage() {
       })();
 
   // ── Analytics: farmer uses RPC result, admin uses dbReport ───────────
-  // ── Analytics Aggregator (Frontend Fallback for failing RPC) ─────────
-  // Use centralized analytics hook for aggregation
+  // ── Analytics Aggregator (Unified Calculation for Local & Farmers) ──
   const analytics = useFarmAnalytics({
     shipments: farmShipments,
     farmExpenses: farmExpensesList,
@@ -185,40 +169,19 @@ export default function FarmManagementPage() {
     workerPayments: workerPaymentsList
   });
 
-  const localReport = {
-    total_sales: analytics.totalSales,
-    total_farmer_net: analytics.totalFarmerNet,
-    collected_sales: analytics.collectedSales,
-    collected_farmer_net: analytics.collectedFarmerNet,
-    pending_sales: analytics.pendingSales,
-    pending_farmer_net: analytics.pendingFarmerNet,
-    total_production: analytics.totalProduction,
-    water_expenses: analytics.waterExpenses,
-    boxes_expenses: analytics.boxesExpenses,
-    supplies_expenses: analytics.suppliesExpenses,
-    total_attendance_cost: analytics.laborCosts,
-    total_worker_payments: analytics.workerPaymentsTotal,
-    total_expenses: analytics.totalOperatingExpenses,
-    net_profit: analytics.netProfit,
-    farmer_net_profit: analytics.farmerNetProfit
-  };
-
-  // Use RPC report if available, otherwise use local fallback
-  const report = isFarmerReadonly ? farmerAnalytics : (dbReport || localReport);
-
-  const farmSales = isFarmerReadonly ? (farmerAnalytics?.totalFarmerNet || 0) : report.total_farmer_net;
-  const collectedSales = isFarmerReadonly ? (farmerAnalytics?.collectedFarmerNet || 0) : report.collected_farmer_net;
-  const pendingSales = isFarmerReadonly ? (farmerAnalytics?.pendingFarmerNet || 0) : report.pending_farmer_net;
-  const farmProduction = isFarmerReadonly ? (farmerAnalytics?.totalProduction || 0) : report.total_production;
-  const totalExpenses = isFarmerReadonly ? (farmerAnalytics?.totalExpenses || 0) : report.total_expenses;
-  const netProfit = isFarmerReadonly ? (farmerAnalytics?.farmerNetProfit || 0) : report.farmer_net_profit;
+  const farmSales = isFarmerReadonly ? analytics.totalFarmerNet : analytics.totalSales;
+  const collectedSales = isFarmerReadonly ? analytics.collectedFarmerNet : analytics.collectedSales;
+  const pendingSales = isFarmerReadonly ? analytics.pendingFarmerNet : analytics.pendingSales;
+  const farmProduction = analytics.totalProduction;
+  const totalExpenses = analytics.totalOperatingExpenses;
+  const netProfit = isFarmerReadonly ? analytics.farmerNetProfit : analytics.netProfit;
 
   const expenseBreakdown = [
-    { label: 'مياه', value: report.water_expenses || 0, color: 'text-blue-700', bg: 'bg-blue-50' },
-    { label: 'كراتين', value: report.boxes_expenses || 0, color: 'text-amber-700', bg: 'bg-amber-50' },
-    { label: 'لوازم', value: report.supplies_expenses || 0, color: 'text-indigo-700', bg: 'bg-indigo-50' },
-    { label: 'أجور العمال', value: report.total_attendance_cost || 0, color: 'text-rose-700', bg: 'bg-rose-50' },
-    { label: 'دفعات العمال', value: report.total_worker_payments || 0, color: 'text-purple-700', bg: 'bg-purple-50' },
+    { label: 'مياه', value: analytics.waterExpenses || 0, color: 'text-blue-700', bg: 'bg-blue-50' },
+    { label: 'كراتين', value: analytics.boxesExpenses || 0, color: 'text-amber-700', bg: 'bg-amber-50' },
+    { label: 'لوازم', value: analytics.suppliesExpenses || 0, color: 'text-indigo-700', bg: 'bg-indigo-50' },
+    { label: 'أجور العمال', value: analytics.laborCosts || 0, color: 'text-rose-700', bg: 'bg-rose-50' },
+    { label: 'دفعات العمال', value: analytics.workerPaymentsTotal || 0, color: 'text-purple-700', bg: 'bg-purple-50' },
   ];
 
   // ── Crop Report (for FarmReportsTab) → built from farmShipments ───────
@@ -228,7 +191,7 @@ export default function FarmManagementPage() {
       const key = s.cropId || 'unknown';
       const name = s.cropName || allRelevantCrops.find(c => c.id === s.cropId)?.name || 'غير محدد';
       if (!map.has(key)) {
-        map.set(key, { id: key, name, shipmentsCount: 0, productionQuantity: 0, sales: 0, farmerNet: 0, collected: 0, collectedNet: 0, pending: 0, pendingNet: 0, averagePricePerUnit: 0 });
+        map.set(key, { id: key, name, shipmentsCount: 0, productionQuantity: 0, collectedQuantity: 0, sales: 0, farmerNet: 0, collected: 0, collectedNet: 0, pending: 0, pendingNet: 0, averagePricePerUnit: 0 });
       }
       const r = map.get(key)!;
       r.shipmentsCount++;
@@ -238,6 +201,7 @@ export default function FarmManagementPage() {
       if (['collected', 'farmer_delivered', 'archived'].includes(s.status)) {
         r.collected += s.totalSaleAmount || 0;
         r.collectedNet += s.farmerNetAmount || 0;
+        r.collectedQuantity += s.packagesCount || 0;
       }
     });
     return Array.from(map.values()).map(r => ({
@@ -247,8 +211,32 @@ export default function FarmManagementPage() {
       collected: isFarmerReadonly ? r.collectedNet : r.collected,
       pending: isFarmerReadonly ? (r.farmerNet - r.collectedNet) : (r.sales - r.collected),
       pendingNet: r.farmerNet - r.collectedNet,
-      averagePricePerUnit: r.productionQuantity > 0 ? (isFarmerReadonly ? r.farmerNet : r.sales) / r.productionQuantity : 0,
+      averagePricePerUnit: r.collectedQuantity > 0 ? (isFarmerReadonly ? r.collectedNet : r.collected) / r.collectedQuantity : 0,
     }));
+  })();
+
+  // ── Timeline Data (Last 30 Days) ──────────────────────────────────────
+  const timelineData = (() => {
+    const map = new Map<string, { date: string, sales: number, production: number }>();
+    const last30Days = new Date();
+    last30Days.setDate(last30Days.getDate() - 30);
+
+    const recentShipments = [...farmShipments]
+      .filter(s => new Date(s.date) >= last30Days)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    recentShipments.forEach(s => {
+       const dateObj = new Date(s.date);
+       const dateStr = `${dateObj.getDate()}/${dateObj.getMonth() + 1}`;
+       if (!map.has(dateStr)) map.set(dateStr, { date: dateStr, sales: 0, production: 0 });
+       const r = map.get(dateStr)!;
+       r.production += s.packagesCount || 0;
+       
+       if (['collected', 'farmer_delivered', 'archived'].includes(s.status)) {
+         r.sales += isFarmerReadonly ? (s.farmerNetAmount || 0) : (s.totalSaleAmount || 0);
+       }
+    });
+    return Array.from(map.values());
   })();
 
   // ── Utility functions ─────────────────────────────────────────────────
@@ -531,6 +519,7 @@ export default function FarmManagementPage() {
                 topCropBySales={[...cropReport].sort((a, b) => b.sales - a.sales)[0]}
                 totalFarmQuantity={cropReport.reduce((s: number, i: any) => s + i.productionQuantity, 0)}
                 expenseBreakdown={expenseBreakdown}
+                timelineData={timelineData}
               />
             )}
           </motion.div>
