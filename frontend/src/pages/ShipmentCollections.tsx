@@ -25,6 +25,7 @@ export default function ShipmentCollectionsPage() {
   const [collectingShipments, setCollectingShipments] = useState<Shipment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const receiptRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,6 +127,11 @@ export default function ShipmentCollectionsPage() {
       const initialBulkValues: Record<string, string> = {};
       shipmentsToCollect.forEach(sh => initialBulkValues[sh.id] = '');
       setBulkSaleValues(initialBulkValues);
+      
+      // Default bulk to uniform price mode for individual entry
+      setUniformPrice(true);
+      const totalPkgs = shipmentsToCollect.reduce((sum, s) => sum + s.packagesCount, 0);
+      setSaleBatches([{ quantity: totalPkgs, pricePerUnit: 0, total: 0 }]);
     }
   };
 
@@ -146,9 +152,11 @@ export default function ShipmentCollectionsPage() {
   const singleFarmerNet = singleFinalTotal - singleCommissionAmount - singleRentalTotal;
 
   // Shared math for Bulk mode
+  const bulkCalculatedTotal = uniformPrice ? 0 : saleBatches.reduce((sum, b) => sum + b.total, 0);
   const bulkTotalSale = useMemo(() => {
+    if (!uniformPrice && bulkCalculatedTotal > 0) return bulkCalculatedTotal;
     return collectingShipments.reduce((sum, sh) => sum + parseFloat(bulkSaleValues[sh.id] || '0'), 0);
-  }, [bulkSaleValues, collectingShipments]);
+  }, [bulkSaleValues, collectingShipments, uniformPrice, bulkCalculatedTotal]);
 
   const bulkTotalCommission = bulkTotalSale * (parseFloat(merchantCommissionRate || '0') / 100);
   const bulkTotalRental = collectingShipments.reduce((sum, sh) => sum + sh.packagesCount, 0) * parseFloat(boxRentalPerUnit || '0');
@@ -181,9 +189,13 @@ export default function ShipmentCollectionsPage() {
         return toast.error('يرجى تعبئة جميع دفعات البيع');
       }
     } else {
-      const anyEmpty = collectingShipments.some(sh => !bulkSaleValues[sh.id] || parseFloat(bulkSaleValues[sh.id]) <= 0);
-      if(anyEmpty) {
-        return toast.error('يرجى إدخال مبلغ التحصيل لكل شحنة');
+      if (uniformPrice) {
+        const anyEmpty = collectingShipments.some(sh => !bulkSaleValues[sh.id] || parseFloat(bulkSaleValues[sh.id]) <= 0);
+        if(anyEmpty) {
+          return toast.error('يرجى إدخال مبلغ التحصيل لكل شحنة');
+        }
+      } else {
+        if (bulkCalculatedTotal <= 0) return toast.error('يرجى إدخال دفعات البيع');
       }
     }
 
@@ -199,7 +211,6 @@ export default function ShipmentCollectionsPage() {
           console.warn("Compression failed, using original file", e);
         }
 
-        // Use the first shipment id as the unique folder
         const path = buildReceiptPath('shipment_receipts', collectingShipments[0].id, fileToUpload.name);
         const { error: upErr } = await supabase.storage.from('receipts').upload(path, fileToUpload, { upsert: true });
         if (upErr) throw new Error('فشل رفع الفاتورة: ' + upErr.message);
@@ -208,8 +219,20 @@ export default function ShipmentCollectionsPage() {
 
       await Promise.all(collectingShipments.map(sh => {
          const isSingle = collectingShipments.length === 1;
+         const totalPkgs = collectingShipments.reduce((sum, s) => sum + s.packagesCount, 0);
          
-         const saleValue = isSingle ? singleFinalTotal : parseFloat(bulkSaleValues[sh.id] || '0');
+         let saleValue = 0;
+         if (isSingle) {
+           saleValue = singleFinalTotal;
+         } else {
+           if (uniformPrice) {
+             saleValue = parseFloat(bulkSaleValues[sh.id] || '0');
+           } else {
+             const ratio = sh.packagesCount / totalPkgs;
+             saleValue = bulkTotalSale * ratio;
+           }
+         }
+
          const commRate = parseFloat(merchantCommissionRate || '0');
          const commAmount = saleValue * (commRate / 100);
          
@@ -220,10 +243,10 @@ export default function ShipmentCollectionsPage() {
          return updateDocument('shipments', sh.id, {
             status: 'collected',
             totalSaleAmount: saleValue,
-            saleMethod: isSingle ? saleMethod : 'box', // Default box for bulk for now
-            uniformPrice: isSingle ? uniformPrice : true,
-            pricePerUnit: isSingle ? (uniformPrice ? parseFloat(pricePerUnit || '0') : undefined) : saleValue,
-            saleBatches: isSingle && !uniformPrice ? saleBatches : undefined,
+            saleMethod: isSingle ? saleMethod : 'box', 
+            uniformPrice: uniformPrice,
+            pricePerUnit: isSingle ? (uniformPrice ? parseFloat(pricePerUnit || '0') : undefined) : (uniformPrice ? saleValue : undefined),
+            saleBatches: !uniformPrice ? saleBatches : undefined,
             merchantCommissionRate: commRate,
             merchantCommissionAmount: commAmount,
             boxRentalPerUnit: rentalRate,
@@ -298,7 +321,7 @@ export default function ShipmentCollectionsPage() {
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-4 sm:p-5 space-y-4">
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-4 sm:p-5 space-y-6">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="w-4 h-4 text-blue-600" />
           <span className="text-sm font-black text-gray-700">تصفية النتائج</span>
@@ -314,7 +337,6 @@ export default function ShipmentCollectionsPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Search */}
           <div className="relative lg:col-span-1">
             <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -422,7 +444,7 @@ export default function ShipmentCollectionsPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {filteredShipments.map((sh, idx) => {
             const farmer = farmers.find(f => f.id === sh.farmerId);
             const crop = crops.find(c => c.id === sh.cropId);
@@ -594,7 +616,7 @@ export default function ShipmentCollectionsPage() {
                            </div>
                          </div>
                        ) : (
-                         <div className="space-y-4">
+                         <div className="space-y-6">
                            <div className="flex items-center justify-between border-b pb-4">
                              <label className="text-sm font-black text-gray-700">سجل دفعات البيع الجزئية</label>
                              <button onClick={() => setSaleBatches(prev => [...prev, { quantity: 0, pricePerUnit: 0, total: 0 }])}
@@ -633,72 +655,107 @@ export default function ShipmentCollectionsPage() {
                        )}
                      </div>
 
-                     <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden">
-                       <div className="absolute left-0 top-0 w-32 h-32 bg-amber-50 rounded-br-full -z-10" />
-                       <label className="text-sm font-black text-gray-700 mb-2 block">
-                         إجمالي المبلغ المالي المحصل الفعلي (للتسوية وتجاوز المحسوب)
-                       </label>
-                       <input type="number" min="0" step="0.01" value={totalOverride}
-                         onChange={e => setTotalOverride(e.target.value)}
-                         placeholder={`المحسوب للتحصيل: ${formatCurrency(computedTotal())}`}
-                         className="w-full px-5 py-4 bg-gray-50 border-2 border-transparent focus:border-blue-500 shadow-inner rounded-[1.5rem] outline-none text-lg font-black transition-all" />
-                       <p className="text-[10px] text-gray-400 font-bold mt-2 pr-2">اتركه فارغاً لاعتماد المبلغ المحسوب من السعر والكمية.</p>
-                     </div>
+                     <div className={cn("bg-white p-6 rounded-[2rem] border-2 shadow-sm relative overflow-hidden transition-all",
+                        totalOverride ? "border-amber-400 bg-amber-50/20" : "border-gray-100")}>
+                        <div className="absolute left-0 top-0 w-32 h-32 bg-amber-50 rounded-br-full -z-10" />
+                        <label className="text-sm font-black text-gray-700 mb-2 block flex items-center justify-between">
+                          <span>إجمالي المبلغ المالي المحصل الفعلي</span>
+                          <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-md">للتسوية اليدوية</span>
+                        </label>
+                        <input type="number" min="0" step="0.01" value={totalOverride}
+                          onChange={e => setTotalOverride(e.target.value)}
+                          placeholder={`المحسوب للتحصيل: ${formatCurrency(computedTotal())}`}
+                          className="w-full px-5 py-4 bg-gray-50 border-2 border-transparent focus:border-blue-500 shadow-inner rounded-[1.5rem] outline-none text-lg font-black transition-all" />
+                        <p className="text-[10px] text-gray-400 font-bold mt-2 pr-2">اتركه فارغاً لاعتماد المبلغ المحسوب من السعر والكمية.</p>
+                      </div>
                    </div>
                 )}
 
-                {/* --- Bulk Mode UI --- */}
-                {collectingShipments.length > 1 && (
-                   <div className="space-y-4">
-                     <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex items-start gap-3">
-                        <TrendingUp className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
-                        <p className="text-sm font-bold text-indigo-900 leading-relaxed">
-                           قم بإدخال قيمة التحصيل الفعلي (صافي البيع قبل أي خصومات) لكل شحنة على حدة لتخصيص الأرباح بدقة للمزارعين، وسيتم اقتطاع النسب والإيجار تلقائياً في الفاتورة المجمعة.
-                        </p>
-                     </div>
-                     <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="hidden sm:grid grid-cols-12 gap-4 p-4 border-b border-gray-100 bg-gray-50/50 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">
-                           <div className="col-span-2">الشحنة</div>
-                           <div className="col-span-2">المزارع</div>
-                           <div className="col-span-2">المحصول</div>
-                           <div className="col-span-2">الكمية</div>
-                           <div className="col-span-4">المبلغ الكلي المحصل (₪)</div>
-                        </div>
-                        <div className="divide-y divide-gray-50">
-                           {collectingShipments.map(sh => (
-                              <div key={sh.id} className="grid grid-cols-1 sm:grid-cols-12 gap-4 p-4 items-center hover:bg-gray-50 transition-colors">
-                                 <div className="sm:col-span-2 flex justify-between sm:block">
-                                    <span className="sm:hidden text-xs font-bold text-gray-400">الشحنة</span>
-                                    <span className="font-black text-sm bg-gray-100 px-2 py-1 rounded-lg">#{sh.shipmentNumber}</span>
-                                 </div>
-                                 <div className="sm:col-span-2 flex justify-between sm:block">
-                                    <span className="sm:hidden text-xs font-bold text-gray-400">المزارع</span>
-                                    <span className="text-sm font-bold text-gray-700">{farmers.find(f => f.id === sh.farmerId)?.name}</span>
-                                 </div>
-                                 <div className="sm:col-span-2 flex justify-between sm:block">
-                                    <span className="sm:hidden text-xs font-bold text-gray-400">المحصول</span>
-                                    <span className="text-sm font-bold text-gray-700">{crops.find(c => c.id === sh.cropId)?.name} {sh.grade && sh.grade !== 'MIXED' && `(${sh.grade})`}</span>
-                                 </div>
-                                 <div className="sm:col-span-2 flex justify-between sm:block">
-                                    <span className="sm:hidden text-xs font-bold text-gray-400">الكمية</span>
-                                    <span className="text-sm font-black text-gray-900 bg-blue-50 text-blue-700 px-2 py-1 rounded-lg">{sh.packagesCount} طرد</span>
-                                 </div>
-                                 <div className="sm:col-span-4">
-                                    <div className="relative">
-                                      <input type="number" min="0" step="0.01" 
-                                         value={bulkSaleValues[sh.id] || ''}
-                                         onChange={e => setBulkSaleValues(p => ({...p, [sh.id]: e.target.value}))}
-                                         placeholder="المبلغ (₪) للشحنة"
-                                         className="w-full pl-6 pr-4 py-3 bg-white border border-gray-200 focus:border-green-500 shadow-inner rounded-xl outline-none text-base font-black transition-all" />
-                                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 font-black pointer-events-none">₪</span>
+                 {/* --- Bulk Mode UI --- */}
+                 {collectingShipments.length > 1 && (
+                    <div className="space-y-6">
+                      <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex items-center justify-between">
+                         <div className="flex items-start gap-3">
+                           <TrendingUp className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                           <p className="text-sm font-bold text-indigo-900 leading-relaxed">
+                              {uniformPrice 
+                                ? "أدخل قيمة التحصيل لكل شحنة على حدة." 
+                                : "أدخل دفعات البيع لكامل الكمية (سيتم توزيعها نسبياً)."}
+                           </p>
+                         </div>
+                         <div className="flex bg-white p-1 rounded-xl border border-indigo-200 shadow-sm shrink-0">
+                            <button onClick={() => setUniformPrice(true)} className={cn("px-4 py-1.5 rounded-lg text-xs font-black transition-all", uniformPrice ? "bg-indigo-600 text-white shadow-md" : "text-gray-400 hover:text-gray-600")}>إدخال فردي</button>
+                            <button onClick={() => setUniformPrice(false)} className={cn("px-4 py-1.5 rounded-lg text-xs font-black transition-all", !uniformPrice ? "bg-indigo-600 text-white shadow-md" : "text-gray-400 hover:text-gray-600")}>أسعار متعددة</button>
+                         </div>
+                      </div>
+
+                      {!uniformPrice ? (
+                         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
+                            <div className="flex items-center justify-between border-b pb-4">
+                              <label className="text-sm font-black text-gray-700">توزيع أسعار البيع لكافة الشحنات ({collectingShipments.reduce((s,sh)=>s+sh.packagesCount,0)} طرد)</label>
+                              <button onClick={() => setSaleBatches(prev => [...prev, { quantity: 0, pricePerUnit: 0, total: 0 }])}
+                                className="flex items-center gap-1 text-xs font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg">
+                                <Plus className="w-3 h-3" /> إضافة سعر بيع آخر
+                              </button>
+                            </div>
+                            <div className="space-y-3">
+                              {saleBatches.map((batch, i) => (
+                                <div key={i} className="flex gap-2 items-center">
+                                  <input type="number" placeholder="الكمية" value={batch.quantity || ''} onChange={e => updateBatch(i, 'quantity', parseFloat(e.target.value) || 0)}
+                                    className="w-1/3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none" />
+                                  <input type="number" placeholder="السعر" value={batch.pricePerUnit || ''} onChange={e => updateBatch(i, 'pricePerUnit', parseFloat(e.target.value) || 0)}
+                                    className="w-1/3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none" />
+                                  <div className="w-1/3 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black text-center">{formatCurrency(batch.total)}</div>
+                                  {saleBatches.length > 1 && <button onClick={() => setSaleBatches(p => p.filter((_,j)=>j!==i))} className="text-rose-500 p-1"><Trash2 className="w-4 h-4"/></button>}
+                                </div>
+                              ))}
+                            </div>
+                         </div>
+                      ) : (
+                        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+                           <div className="hidden sm:grid grid-cols-12 gap-4 p-4 border-b border-gray-100 bg-gray-50/50 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">
+                              <div className="col-span-2">الشحنة</div>
+                              <div className="col-span-2">المزارع</div>
+                              <div className="col-span-2">المحصول</div>
+                              <div className="col-span-2">الكمية</div>
+                              <div className="col-span-4">المبلغ الكلي المحصل (₪)</div>
+                           </div>
+                           <div className="divide-y divide-gray-50">
+                              {collectingShipments.map(sh => (
+                                 <div key={sh.id} className="grid grid-cols-1 sm:grid-cols-12 gap-4 p-4 items-center hover:bg-gray-50 transition-colors">
+                                    <div className="sm:col-span-2 flex justify-between sm:block">
+                                       <span className="sm:hidden text-xs font-bold text-gray-400">الشحنة</span>
+                                       <span className="font-black text-sm bg-gray-100 px-2 py-1 rounded-lg">#{sh.shipmentNumber}</span>
+                                    </div>
+                                    <div className="sm:col-span-2 flex justify-between sm:block">
+                                       <span className="sm:hidden text-xs font-bold text-gray-400">المزارع</span>
+                                       <span className="text-sm font-bold text-gray-700">{farmers.find(f => f.id === sh.farmerId)?.name}</span>
+                                    </div>
+                                    <div className="sm:col-span-2 flex justify-between sm:block">
+                                       <span className="sm:hidden text-xs font-bold text-gray-400">المحصول</span>
+                                       <span className="text-sm font-bold text-gray-700">{crops.find(c => c.id === sh.cropId)?.name} {sh.grade && sh.grade !== 'MIXED' && `(${sh.grade})`}</span>
+                                    </div>
+                                    <div className="sm:col-span-2 flex justify-between sm:block">
+                                       <span className="sm:hidden text-xs font-bold text-gray-400">الكمية</span>
+                                       <span className="text-sm font-black text-gray-900 bg-blue-50 text-blue-700 px-2 py-1 rounded-lg">{sh.packagesCount} طرد</span>
+                                    </div>
+                                    <div className="sm:col-span-4">
+                                       <div className="relative">
+                                         <input type="number" min="0" step="0.01" 
+                                            value={bulkSaleValues[sh.id] || ''}
+                                            onChange={e => setBulkSaleValues(p => ({...p, [sh.id]: e.target.value}))}
+                                            placeholder="المبلغ (₪) للشحنة"
+                                            className="w-full pl-6 pr-4 py-3 bg-white border border-gray-200 focus:border-green-500 shadow-inner rounded-xl outline-none text-base font-black transition-all" />
+                                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 font-black pointer-events-none">₪</span>
+                                       </div>
                                     </div>
                                  </div>
-                              </div>
-                           ))}
+                              ))}
+                           </div>
                         </div>
-                     </div>
-                   </div>
-                )}
+                      )}
+                    </div>
+                 )}
 
 
                 <div className="border-t-2 border-dashed border-gray-200 my-8 relative">
@@ -799,16 +856,25 @@ export default function ShipmentCollectionsPage() {
                         </button>
                       </div>
                     ) : (
-                      <button onClick={() => receiptRef.current?.click()}
-                        className="w-full h-48 border-2 border-dashed border-gray-300 rounded-[2.5rem] hover:border-indigo-400 hover:bg-indigo-50 transition-all font-bold text-gray-400 hover:text-indigo-600 flex flex-col justify-center items-center gap-3 group bg-white shadow-sm">
-                         <div className="bg-indigo-600 p-4 rounded-full shadow-lg group-hover:scale-110 transition-transform mb-2">
-                            <Camera className="w-10 h-10 text-white" />
-                         </div>
-                         <span className="text-sm font-black text-indigo-600">التقاط صورة الفاتورة الآن</span>
-                         <span className="text-[10px] text-gray-400">أو انقر هنا لاختيار ملف موجود من المعرض</span>
-                      </button>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button onClick={() => receiptRef.current?.click()}
+                          className="h-40 border-2 border-dashed border-gray-300 rounded-[2rem] hover:border-blue-400 hover:bg-blue-50 transition-all font-bold text-gray-400 hover:text-blue-600 flex flex-col justify-center items-center gap-2 group bg-white shadow-sm">
+                           <div className="bg-blue-600 p-3 rounded-full shadow-lg group-hover:scale-110 transition-transform">
+                              <Camera className="w-6 h-6 text-white" />
+                           </div>
+                           <span className="text-xs font-black text-blue-600">التقاط صورة</span>
+                        </button>
+                        <button onClick={() => galleryRef.current?.click()}
+                          className="h-40 border-2 border-dashed border-gray-300 rounded-[2rem] hover:border-indigo-400 hover:bg-indigo-50 transition-all font-bold text-gray-400 hover:text-indigo-600 flex flex-col justify-center items-center gap-2 group bg-white shadow-sm">
+                           <div className="bg-indigo-600 p-3 rounded-full shadow-lg group-hover:scale-110 transition-transform">
+                              <Image className="w-6 h-6 text-white" />
+                           </div>
+                           <span className="text-xs font-black text-indigo-600">من المعرض</span>
+                        </button>
+                      </div>
                     )}
                     <input ref={receiptRef} type="file" accept="image/*" capture="environment" onChange={handleReceiptChange} className="hidden" />
+                    <input ref={galleryRef} type="file" accept="image/*" onChange={handleReceiptChange} className="hidden" />
                   </div>
 
                   {/* Notes */}
